@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-import urllib
 import json
 import sqlite3
 import time
+import urllib.request 
 
 from gmusicapi import Mobileclient
 
@@ -20,8 +20,8 @@ class HitlistWS:
 		playlistUrl = "http://triplejgizmo.abc.net.au/jjj-hitlist/current/app/webroot/latest/play.txt"
 		playlist = []
 		
-		uh = urllib.urlopen(playlistUrl)
-		data = uh.read()
+		uh = urllib.request.urlopen(playlistUrl)
+		data = (uh.read().decode('utf-8'))
 		js = json.loads(str(data))
 		
 		for entry in js:
@@ -102,27 +102,27 @@ class GMusicWS:
 	def __init__(self, user, password, playlistName):
 		self.playlistName = playlistName
 		self.api = Mobileclient()
-		print "Logging into MobileClient API"
-		self.api.login(user, password)
+		print ("Logging into MobileClient API")
+		self.api.login(user, password,"android_id") #insert unique android_id here
 
 	def mapUnknownTracks(self, db):
 		playlist = db.unmappedTracks()
 		
 		for track in playlist:
 			searchstr = track.artist + " " + track.song
-			print "Searching for %s" % (searchstr)
+			print ("Searching for %s" % (searchstr))
 			try:
 				result = self.api.search_all_access(searchstr, max_results=1)
-				print "Found " + result['song_hits'][0]['track']['artist'] + " - " + result['song_hits'][0]['track']['title']
+				print ("Found " + result['song_hits'][0]['track']['artist'] + " - " + result['song_hits'][0]['track']['title'])
 				nid = result['song_hits'][0]['track']['nid']
 				db.storemapping(track.song, track.artist, nid)
 			except:
-				print "Error parsing result: " + str(result)
+				print ("Error parsing result: " + str(result))
 				
 			time.sleep(1)
 	
 	def maintain(self, tracks):
-		print "Searching for playlist %s" % (self.playlistName)
+		print ("Searching for playlist %s" % (self.playlistName))
 				
 		found = False
 		searchres = self.api.get_all_playlists()
@@ -132,12 +132,12 @@ class GMusicWS:
 				pid = list['id']
 				
 		if not found:
-			print "Not found - creating"
+			print ("Not found - creating")
 			pid = self.api.create_playlist(self.playlistName)
 		
-		print "Playlist id is %s" % (pid)
+		print ("Playlist id is %s" % (pid))
 		
-		print "Getting current contents"
+		print ("Getting current contents")
 		playlists = self.api.get_all_user_playlist_contents()
 		currentEntries = []
 		for playlist in playlists:
@@ -145,10 +145,10 @@ class GMusicWS:
 				for entry in playlist['tracks']:
 					currentEntries.append(entry['id'])
 
-		print "Removing songs"		
+		print ("Removing songs")		
 		self.api.remove_entries_from_playlist(currentEntries)
 		
-		print "Adding songs"
+		print ("Adding songs")
 		self.api.add_songs_to_playlist(pid, tracks)
 	
 def main():
@@ -156,16 +156,16 @@ def main():
 	
 	db.open()
 	
-	print "Getting hitlist from WS"
+	print ("Getting hitlist from WS")
 	hitws = HitlistWS()
 	playlist = hitws.playlist()
 	
-	print "Updating DB cache"
+	print ("Updating DB cache")
 	db.update(playlist)
 
-	gws = GMusicWS('user@gmail.com', 'password', 'Triple J Hitlist')
+	gws = GMusicWS('user@gmail.com', 'password', 'Triple J Hitlist') #gmail credentials
 	
-	print "Mapping unknown tracks"
+	print ("Mapping unknown tracks")
 	gws.mapUnknownTracks(db)
 		
 	gws.maintain(db.playlist())
